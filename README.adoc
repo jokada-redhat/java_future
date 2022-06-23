@@ -1,0 +1,91 @@
+= Future の動き
+:author: jokada
+:revnumber: 1
+:revdate: 2022-06-23
+:sectnums:
+:appendix-caption: 付録
+:toc-title: 目次
+:toc: left
+:icons: font
+
+[[docment-spec]]
+
+// 以下はacriidocの定数です（同じ定義をplantuml側にも定義しています。双方での共通化は検討の余地あり）
+// :p_name:             Alias
+
+[[description-section]]
+
+[[source,java]]
+.sample code
+----
+public static void main(String[] args) {
+    // 1. ExecutorService の準備
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    // 2｡ 実行したい処理を作成
+    Callable<String> test1 = new Callable<String>() {
+        @Override
+        public String call() throws Exception {
+            return "test";
+        }
+    };
+
+    // 3. ExecutorService に処理を依頼
+    Future<String> future = executor.submit(test1);
+
+    // 4. 終了を待機
+    try {
+        String result = future.get();
+        System.out.println(result);
+    } catch (CancellationException e) {
+        System.err.println("Failed. 計算が取り消された");
+    } catch (ExecutionException e) {
+        System.err.println("Failed. 計算で例外がスローされた");
+    } catch (InterruptedException e) {
+        System.err.println("Failed. 待機中に現在のスレッドで割込みが発生した");
+    }
+
+    // 1. ExecutorService の終了
+    executor.shutdown();
+}
+----
+
+[plantuml, ./images/Future_処理イメージシーケンス, svg]
+.処理イメージ
+--
+hide footbox
+
+participant "Main" as main
+participant "ExecutorService" as exec
+participant "Callable" as c1
+participant "Future" as f1
+participant "Queue" as q
+participant "Thread" as t
+
+main -> exec **: Executors#newFixedThreadPool
+exec -> q ** : <<create>>
+exec -> t ** : <<create>>
+t --> q : watch
+main -> c1 **: <<create>>
+main -> exec ++ : executor#submit(callble)
+
+exec -> f1 ** : <<create>>
+exec -> q : enqueu
+
+exec -> main -- : return future 
+
+main -> f1 ++ : waiting:\n  future#get
+
+t -> q : dequeue
+
+t -> t ++ : run task  
+t -> c1 ++ : ~#call
+c1 -> t -- : done
+t -> f1 : update condition:\n  #set
+t -> t -- : done
+
+f1 -> main -- : return result
+
+--
+
+
